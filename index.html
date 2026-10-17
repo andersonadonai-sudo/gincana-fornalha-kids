@@ -167,6 +167,22 @@ label.switch{display:flex; align-items:center; justify-content:space-between; ga
 .reslist{width:100%; max-width:420px; display:flex; flex-direction:column; gap:10px; margin:18px 0}
 .reslist .rrow{padding:14px 16px; font-size:16px}
 .reslist .rrow .rpts{font-size:22px}
+/* ---- v1.5 moderno ---- */
+.btn,.sbtn,.tabbtn,.roundchips button,.stchips button,.pbtn{position:relative;overflow:hidden;transition:transform .12s ease,box-shadow .25s ease,filter .2s ease}
+.btn{background:linear-gradient(180deg,#ffb340,var(--acc2));box-shadow:0 6px 18px rgba(255,94,0,.42),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn.sec{background:var(--surface2);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.btn:active,.sbtn:active,.pbtn:active,.tabbtn:active{transform:scale(.94)}
+.sbtn.on{box-shadow:0 0 16px rgba(67,160,71,.5),inset 0 1px 0 rgba(255,255,255,.3)}
+.sbtn.on.bad,.sbtn.pen.on{box-shadow:0 0 16px rgba(229,57,53,.55),inset 0 1px 0 rgba(255,255,255,.2)}
+.sbtn:not(.on):hover,.btn:hover{filter:brightness(1.08)}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.5);transform:scale(0);animation:rip .55s ease-out;pointer-events:none}
+@keyframes rip{to{transform:scale(2.8);opacity:0}}
+.card{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#clockwrap{position:relative;width:min(80vw,330px);height:min(80vw,330px);margin:4px auto 0}
+#clockwrap #clock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0;font-size:clamp(50px,14vw,82px)}
+#ringSvg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+#ringFg{transition:stroke-dashoffset .35s linear,stroke .3s ease}
+#syncStatus{font-size:12.5px;color:var(--muted);margin:8px 0 0}
 @media print{
   body{background:#fff; color:#000; padding:0}
   header, nav.tabs, .noprint, #tab-timer, #tab-placar, #tab-config, .overlay{display:none !important}
@@ -194,7 +210,13 @@ label.switch{display:flex; align-items:center; justify-content:space-between; ga
   <section id="tab-timer" class="tab active">
     <div class="roundchips" id="roundChips"></div>
     <div class="card">
+      <div id="clockwrap">
+      <svg id="ringSvg" viewBox="0 0 260 260" aria-hidden="true">
+        <circle cx="130" cy="130" r="118" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="14"></circle>
+        <circle id="ringFg" cx="130" cy="130" r="118" fill="none" stroke="#ff8a1e" stroke-width="14" stroke-linecap="round" stroke-dasharray="741.42" stroke-dashoffset="0"></circle>
+      </svg>
       <div id="clock">12:00</div>
+    </div>
       <div class="tstatus" id="tstatus">Rodada 1 de 4 &middot; apito = troca de esta&ccedil;&atilde;o</div>
       <div class="btnrow">
         <button class="btn" id="btnStartPause">&#9654; INICIAR</button>
@@ -296,6 +318,15 @@ label.switch{display:flex; align-items:center; justify-content:space-between; ga
       <label class="switch"><span>Som do apito/cron&ocirc;metro</span><input type="checkbox" id="sndCfg" checked></label>
     </div>
     <div class="card">
+      <h2>Nuvem <small>&mdash; mesmo placar em v&aacute;rios celulares</small></h2>
+      <label class="switch"><span>Sincronizar automaticamente</span><input type="checkbox" id="cloudAuto" checked></label>
+      <div class="btnrow">
+        <button class="btn" id="btnSync">&#128260; Sincronizar agora</button>
+      </div>
+      <p id="syncStatus">Conectando...</p>
+      <p style="font-size:12px;color:var(--muted);margin:6px 0 0">Abra o mesmo link nos celulares: cada supervisor marca sua esta&ccedil;&atilde;o e o placar se espalha sozinho. Requer internet.</p>
+    </div>
+    <div class="card">
       <h2>Backup</h2>
       <div class="btnrow">
         <button class="btn sec" id="btnBackup">&#11015; Exportar</button>
@@ -382,11 +413,13 @@ function load(){
         if(!Array.isArray(s.scores[t])||s.scores[t].length!==4) s.scores[t]=d.scores[t];
         else for(var e=0;e<4;e++){
           var o=s.scores[t][e]||{};
-          s.scores[t][e]={p:!!o.p,r:!!o.r,c:(o.c===60||o.c===30)?o.c:0,pen:(typeof o.pen==='number'&&o.pen>0)?Math.floor(o.pen):0};
+          s.scores[t][e]={p:!!o.p,r:!!o.r,c:(o.c===60||o.c===30)?o.c:0,pen:(typeof o.pen==='number'&&o.pen>0)?Math.floor(o.pen):0,_ts:(typeof o._ts==='number')?o._ts:0};
         }
       }
     }
     s.sound=(typeof s.sound==='boolean')?s.sound:true;
+    s._ts=(typeof s._ts==='number')?s._ts:0;
+    s.topic=(typeof s.topic==='string'&&s.topic.length>4)?s.topic:'gincana-fornalha-k7d9p2';
     s.schemaVersion=1;
     return s;
   }catch(e){ return defaultState(); }
@@ -400,6 +433,12 @@ function renderClock(){
   var c=document.getElementById('clock');
   c.textContent=fmt(timer.remaining);
   c.className=(timer.remaining<=60?'warn ':'')+(timer.running?'running':'');
+  var fg=document.getElementById('ringFg');
+  if(fg){
+    var frac=Math.max(0,Math.min(1,timer.remaining/ROUND_SEC));
+    fg.setAttribute('stroke-dashoffset',(741.42*(1-frac)).toFixed(1));
+    fg.setAttribute('stroke',timer.remaining<=60?'#e53935':'#ff8a1e');
+  }
 }
 function tick(){
   if(!timer.running) return;
@@ -449,7 +488,7 @@ function finishRound(){
 }
 function nextRound(){
   state.round=state.round>=4?1:state.round+1;
-  save(); resetTimer(); renderTimer(); hideOverlay();
+  state._ts=Date.now(); save(); pubSync(); resetTimer(); renderTimer(); hideOverlay();
 }
 function hideOverlay(){ document.getElementById('overlay').classList.add('hidden'); }
 function stationOf(teamIdx,round){ return (teamIdx+round-1)%4; }
@@ -482,7 +521,7 @@ function renderTimer(){
       var b=document.createElement('button');
       b.textContent='Rodada '+r;
       if(r===state.round) b.className='active';
-      b.onclick=function(){ state.round=r; save(); resetTimer(); renderTimer(); };
+      b.onclick=function(){ state.round=r; state._ts=Date.now(); save(); pubSync(); resetTimer(); renderTimer(); };
       rc.appendChild(b);
     })(r);
   }
@@ -561,7 +600,7 @@ function renderPlacar(){
         ' &middot; Final: <b>'+fin+' pts</b>'+((ganho-penPts)<0?' (piso 0)':'');
       card.appendChild(srow1); card.appendChild(srow2); card.appendChild(srow3); card.appendChild(prow); card.appendChild(mrow);
       box.appendChild(card);
-      function touch(){ save(); renderPlacar(); renderRank(); }
+      function touch(){ o._ts=Date.now(); state._ts=Date.now(); save(); pubSync(); renderPlacar(); renderRank(); }
     })(t);
   }
   renderRank();
@@ -614,8 +653,8 @@ function renderConfig(){
     var row=document.createElement('div'); row.className='cfgrow';
     var txt=document.createElement('input'); txt.type='text'; txt.value=t.name; txt.maxLength=14;
     var col=document.createElement('input'); col.type='color'; col.value=t.color;
-    txt.oninput=function(){ t.name=txt.value.toUpperCase()||('EQUIPE '+(i+1)); save(); renderTimer(); renderRank(); };
-    col.oninput=function(){ t.color=col.value; save(); renderTimer(); renderPlacar(); renderRank(); };
+    txt.oninput=function(){ t.name=txt.value.toUpperCase()||('EQUIPE '+(i+1)); state._ts=Date.now(); save(); pubSync(); renderTimer(); renderRank(); };
+    col.oninput=function(){ t.color=col.value; state._ts=Date.now(); save(); pubSync(); renderTimer(); renderPlacar(); renderRank(); };
     row.appendChild(txt); row.appendChild(col); box.appendChild(row);
   });
   document.getElementById('sndCfg').checked=!!state.sound;
@@ -644,11 +683,11 @@ function doRestore(file){
 }
 function zeroScores(){
   if(!confirm('Zerar TODOS os pontos da gincana?')) return;
-  state.scores=defaultState().scores; save(); renderPlacar(); renderRank();
+  state.scores=defaultState().scores; state._ts=Date.now(); save(); pubSync(); renderPlacar(); renderRank();
 }
 function defaults(){
   if(!confirm('Restaurar equipes padr\u00e3o e zerar placar?')) return;
-  state=defaultState(); save(); resetTimer(); renderAll();
+  state=defaultState(); state._ts=Date.now(); save(); pubSync(); resetTimer(); renderAll();
 }
 
 /* ---------- utils ---------- */
@@ -696,6 +735,80 @@ Array.prototype.forEach.call(document.querySelectorAll('.tabbtn'),function(b){
 
 /* gancho de teste (inofensivo): define segundos restantes */
 window.__test_set=function(sec){ timer.remaining=sec; timer.running=false; if(timer.int)clearInterval(timer.int); timer.int=null; timer.endAt=null; document.getElementById('btnStartPause').innerHTML='&#9654; INICIAR'; renderClock(); };
+
+/* ---------- nuvem (ntfy) ---------- */
+var SYNC={dev:Math.random().toString(36).slice(2,10),since:null,auto:true,lastOk:0,timer:null};
+function topic(){ return state.topic||'gincana-fornalha-k7d9p2'; }
+function pubSync(){
+  try{
+    var payload=JSON.stringify({dev:SYNC.dev,_ts:state._ts,round:state.round,teams:state.teams,scores:state.scores});
+    fetch('https://ntfy.sh/'+topic(),{method:'POST',body:payload}).catch(function(){});
+  }catch(e){}
+}
+function mergeRemote(m){
+  var chg=false;
+  if(!m||m.dev===SYNC.dev) return false;
+  if(Array.isArray(m.scores)){
+    for(var t=0;t<4;t++)for(var e=0;e<4;e++){
+      var rc=m.scores[t]&&m.scores[t][e], lc=state.scores[t][e];
+      if(rc&&typeof rc._ts==='number'&&rc._ts>(lc._ts||0)){
+        state.scores[t][e]={p:!!rc.p,r:!!rc.r,c:(rc.c===60||rc.c===30)?rc.c:0,pen:(typeof rc.pen==='number'&&rc.pen>0)?Math.floor(rc.pen):0,_ts:rc._ts};
+        chg=true;
+      }
+    }
+  }
+  if(typeof m._ts==='number'&&m._ts>(state._ts||0)&&Array.isArray(m.teams)&&m.teams.length===4){
+    state.teams=m.teams; state.round=(typeof m.round==='number'&&m.round>=1&&m.round<=4)?m.round:state.round;
+    state._ts=m._ts; chg=true;
+  }
+  return chg;
+}
+function pullSync(cb){
+  var url='https://ntfy.sh/'+topic()+'/json?poll=1&since='+(SYNC.since||'all');
+  fetch(url).then(function(r){ return r.text(); }).then(function(txt){
+    var lines=txt.split('\n'), chg=false, lastT=null;
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i].trim(); if(!line) continue;
+      try{
+        var m=JSON.parse(line);
+        if(m.event!=='message'||!m.message) continue;
+        lastT=m.time;
+        try{ if(mergeRemote(JSON.parse(m.message))) chg=true; }catch(e2){}
+      }catch(e){}
+    }
+    if(lastT) SYNC.since=lastT;
+    if(chg){ save(); renderAll(); }
+    SYNC.lastOk=Date.now(); renderSyncStatus(false);
+    if(cb)cb(chg);
+  }).catch(function(){ renderSyncStatus(true); if(cb)cb(false); });
+}
+function renderSyncStatus(err){
+  var el=document.getElementById('syncStatus'); if(!el) return;
+  var t=new Date(SYNC.lastOk);
+  var hh=('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
+  el.innerHTML=err?'\u26a0\ufe0f Sem conex\u00e3o agora \u2014 tenta de novo em instantes.'
+    :'\u2601\ufe0f T\u00f3pico: '+esc(topic())+(SYNC.lastOk?' \u00b7 \u00faltimo sync '+hh:' \u00b7 aguardando 1\u00ba sync...');
+}
+function startAuto(){
+  if(SYNC.timer) clearInterval(SYNC.timer);
+  SYNC.timer=setInterval(function(){ if(SYNC.auto&&!document.hidden) pullSync(); },15000);
+}
+document.getElementById('btnSync').onclick=function(){ pullSync(); pubSync(); };
+document.getElementById('cloudAuto').onchange=function(){ SYNC.auto=this.checked; if(SYNC.auto) pullSync(); };
+document.addEventListener('visibilitychange',function(){ if(!document.hidden&&SYNC.auto) pullSync(); });
+
+/* ---------- efeito ripple nos botões ---------- */
+document.addEventListener('click',function(e){
+  var b=e.target.closest('.btn,.sbtn,.tabbtn,.roundchips button,.stchips button,.pbtn');
+  if(!b) return;
+  var r=b.getBoundingClientRect(), d=Math.max(r.width,r.height);
+  var sp=document.createElement('span'); sp.className='ripple';
+  sp.style.width=sp.style.height=d+'px';
+  sp.style.left=(e.clientX-r.left-d/2)+'px'; sp.style.top=(e.clientY-r.top-d/2)+'px';
+  b.appendChild(sp); setTimeout(function(){ sp.remove(); },560);
+},true);
+
+startAuto(); pullSync(); renderSyncStatus(false);
 
 renderAll();
 </script>
