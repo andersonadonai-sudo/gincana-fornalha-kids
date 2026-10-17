@@ -107,6 +107,7 @@ nav.tabs button.active{color:var(--acc1)}
 .sbtn.on{background:linear-gradient(180deg,#43a047,#1b5e20); border-color:transparent; color:#fff}
 .sbtn.on.bad{background:linear-gradient(180deg,#e53935,#b71c1c)}
 .sbtn.pen.on{background:linear-gradient(180deg,#e53935,#b71c1c)}
+.sbtn.pen{border-color:rgba(229,57,53,.55); color:#ff8a80}
 .penrow{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted)}
 .penrow .pbtn{width:40px; height:36px; border-radius:10px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:17px; font-weight:800; cursor:pointer}
 .mathrow{font-size:12px; color:var(--muted); margin-top:8px; font-variant-numeric:tabular-nums}
@@ -528,6 +529,12 @@ function renderPlacar(){
       var b60=mkBtn('Concluiu<small>60 pontos</small>',o.c===60,false,function(){ o.c=(o.c===60?0:60); touch(); });
       var b30=mkBtn('N\u00e3o concluiu<small>30 pontos</small>',o.c===30,true,function(){ o.c=(o.c===30?0:30); touch(); });
       srow2.appendChild(b60); srow2.appendChild(b30);
+      var srow3=document.createElement('div'); srow3.className='srow';
+      var p5=mkBtn('Penalidade<small>\u22125 (1 falha)</small>',false,false,function(){ o.pen+=1; touch(); });
+      var p10=mkBtn('Penalidade<small>\u221210 (2 falhas)</small>',false,false,function(){ o.pen+=2; touch(); });
+      var p20=mkBtn('Penalidade<small>\u221220 (4 falhas)</small>',false,false,function(){ o.pen+=4; touch(); });
+      p5.classList.add('pen'); p10.classList.add('pen'); p20.classList.add('pen');
+      srow3.appendChild(p5); srow3.appendChild(p10); srow3.appendChild(p20);
       var prow=document.createElement('div'); prow.className='penrow';
       var pm=document.createElement('button'); pm.className='pbtn'; pm.textContent='\u2212'; pm.title='Anotar 1 ocorr\u00eancia (\u22125 pts)';
       var pp=document.createElement('button'); pp.className='pbtn'; pp.textContent='+'; pp.title='Desfazer 1 ocorr\u00eancia';
@@ -543,7 +550,7 @@ function renderPlacar(){
       var raw=(o.p?20:0)+(o.r?20:0)+(o.c||0)-o.pen*5, fin=subtotal(t,curStation);
       var mrow=document.createElement('div'); mrow.className='mathrow';
       mrow.innerHTML='Conta: '+esc(exprStr)+' = <b>'+fin+' pts</b>'+(raw<0?' (piso 0)':'');
-      card.appendChild(srow1); card.appendChild(srow2); card.appendChild(prow); card.appendChild(mrow);
+      card.appendChild(srow1); card.appendChild(srow2); card.appendChild(srow3); card.appendChild(prow); card.appendChild(mrow);
       box.appendChild(card);
       function touch(){ save(); renderPlacar(); renderRank(); }
     })(t);
